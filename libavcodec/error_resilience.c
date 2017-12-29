@@ -818,7 +818,8 @@ static int er_supported(ERContext *s)
        s->avctx->codec->capabilities&AV_CODEC_CAP_HWACCEL_VDPAU          ||
 #endif
        !s->cur_pic.f                                                  ||
-       s->cur_pic.field_picture
+       s->cur_pic.field_picture                                       ||
+       s->avctx->profile == FF_PROFILE_MPEG4_SIMPLE_STUDIO
     )
         return 0;
     return 1;
