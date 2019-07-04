@@ -28,6 +28,7 @@
 /.version
 /ffmpeg
 /ffplay
+/ffserver
 /ffprobe
 /config.asm
 /config.h

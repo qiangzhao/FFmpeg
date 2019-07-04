@@ -704,6 +704,11 @@ static int read_var_block_data(ALSDecContext *ctx, ALSBlockData *bd)
         } else {
             *bd->opt_order = sconf->max_order;
         }
+        if (*bd->opt_order > bd->block_length) {
+            *bd->opt_order = bd->block_length;
+            av_log(avctx, AV_LOG_ERROR, "Predictor order too large.\n");
+            return AVERROR_INVALIDDATA;
+        }
         opt_order = *bd->opt_order;
 
         if (opt_order) {
@@ -920,7 +925,7 @@ static int decode_var_block_data(ALSDecContext *ctx, ALSBlockData *bd)
 
     // reconstruct all samples from residuals
     if (bd->ra_block) {
-        for (smp = 0; smp < FFMIN(opt_order, block_length); smp++) {
+        for (smp = 0; smp < opt_order; smp++) {
             y = 1 << 19;
 
             for (sb = 0; sb < smp; sb++)
@@ -1378,9 +1383,6 @@ static SoftFloat_IEEE754 multiply(SoftFloat_IEEE754 a, SoftFloat_IEEE754 b) {
     // Multiply mantissa bits in a 64-bit register
     mantissa_temp = (uint64_t)a.mant * (uint64_t)b.mant;
     mask_64       = (uint64_t)0x1 << 47;
-
-    if (!mantissa_temp)
-        return FLOAT_0;
 
     // Count the valid bit count
     while (!(mantissa_temp & mask_64) && mask_64) {

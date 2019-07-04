@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include "config.h"
 
-#if HAVE_INLINE_ASM && defined(__ARM_ARCH_7A__)
+#if HAVE_INLINE_ASM && defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_6ZK__)
 
 #define AV_READ_TIME read_time
 

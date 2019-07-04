@@ -43,7 +43,7 @@ typedef struct {
     IcoImage * images;
 } IcoDemuxContext;
 
-static int probe(const AVProbeData *p)
+static int probe(AVProbeData *p)
 {
     unsigned i, frames, checked = 0;
 
@@ -96,10 +96,8 @@ static int read_header(AVFormatContext *s)
             break;
 
         st = avformat_new_stream(s, NULL);
-        if (!st) {
-            av_freep(&ico->images);
+        if (!st)
             return AVERROR(ENOMEM);
-        }
 
         st->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
         st->codecpar->width      = avio_r8(pb);
@@ -113,7 +111,6 @@ static int read_header(AVFormatContext *s)
         ico->images[i].size   = avio_rl32(pb);
         if (ico->images[i].size <= 0) {
             av_log(s, AV_LOG_ERROR, "Invalid image size %d\n", ico->images[i].size);
-            av_freep(&ico->images);
             return AVERROR_INVALIDDATA;
         }
         ico->images[i].offset = avio_rl32(pb);
@@ -129,10 +126,8 @@ static int read_header(AVFormatContext *s)
             st->codecpar->height   = 0;
             break;
         case 40:
-            if (ico->images[i].size < 40) {
-                av_freep(&ico->images);
+            if (ico->images[i].size < 40)
                 return AVERROR_INVALIDDATA;
-            }
             st->codecpar->codec_id = AV_CODEC_ID_BMP;
             tmp = avio_rl32(pb);
             if (tmp)
@@ -143,7 +138,6 @@ static int read_header(AVFormatContext *s)
             break;
         default:
             avpriv_request_sample(s, "codec %d", codec);
-            av_freep(&ico->images);
             return AVERROR_INVALIDDATA;
         }
     }

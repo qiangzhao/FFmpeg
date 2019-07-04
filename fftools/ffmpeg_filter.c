@@ -65,7 +65,6 @@ enum AVPixelFormat choose_pixel_fmt(AVStream *st, AVCodecContext *enc_ctx, AVCod
     if (codec && codec->pix_fmts) {
         const enum AVPixelFormat *p = codec->pix_fmts;
         const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(target);
-        //FIXME: This should check for AV_PIX_FMT_FLAG_ALPHA after PAL8 pixel format without alpha is implemented
         int has_alpha = desc ? desc->nb_components % 2 == 0 : 0;
         enum AVPixelFormat best= AV_PIX_FMT_NONE;
 
@@ -293,17 +292,10 @@ static void init_input_filter(FilterGraph *fg, AVFilterInOut *in)
             exit_program(1);
         }
         ist = input_streams[input_files[file_idx]->ist_index + st->index];
-        if (ist->user_set_discard == AVDISCARD_ALL) {
-            av_log(NULL, AV_LOG_FATAL, "Stream specifier '%s' in filtergraph description %s "
-                   "matches a disabled input stream.\n", p, fg->graph_desc);
-            exit_program(1);
-        }
     } else {
         /* find the first unused stream of corresponding type */
         for (i = 0; i < nb_input_streams; i++) {
             ist = input_streams[i];
-            if (ist->user_set_discard == AVDISCARD_ALL)
-                continue;
             if (ist->dec_ctx->codec_type == type && ist->discard)
                 break;
         }
@@ -348,7 +340,6 @@ int init_complex_filtergraph(FilterGraph *fg)
     graph = avfilter_graph_alloc();
     if (!graph)
         return AVERROR(ENOMEM);
-    graph->nb_threads = 1;
 
     ret = avfilter_graph_parse2(graph, fg->graph_desc, &inputs, &outputs);
     if (ret < 0)
@@ -739,7 +730,6 @@ static int sub2video_prepare(InputStream *ist, InputFilter *ifilter)
     if (!ist->sub2video.frame)
         return AVERROR(ENOMEM);
     ist->sub2video.last_pts = INT64_MIN;
-    ist->sub2video.end_pts  = INT64_MIN;
     return 0;
 }
 
@@ -783,7 +773,7 @@ static int configure_input_video_filter(FilterGraph *fg, InputFilter *ifilter,
     sar = ifilter->sample_aspect_ratio;
     if(!sar.den)
         sar = (AVRational){0,1};
-    av_bprint_init(&args, 0, AV_BPRINT_SIZE_AUTOMATIC);
+    av_bprint_init(&args, 0, 1);
     av_bprintf(&args,
              "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:"
              "pixel_aspect=%d/%d:sws_param=flags=%d",
@@ -981,7 +971,7 @@ static int configure_input_filter(FilterGraph *fg, InputFilter *ifilter,
 {
     if (!ifilter->ist->dec) {
         av_log(NULL, AV_LOG_ERROR,
-               "No decoder for stream #%d:%d, filtering impossible\n",
+               "This build of ffmpeg does not have a suitable decoder for stream #%d:%d enabled, filtering impossible\n",
                ifilter->ist->file_index, ifilter->ist->st->index);
         return AVERROR_DECODER_NOT_FOUND;
     }
@@ -1131,7 +1121,7 @@ int configure_filtergraph(FilterGraph *fg)
         if (!ost->enc) {
             /* identical to the same check in ffmpeg.c, needed because
                complex filter graphs are initialized earlier */
-            av_log(NULL, AV_LOG_ERROR, "Encoder (codec %s) not found for output stream #%d:%d\n",
+            av_log(NULL, AV_LOG_ERROR, "This build of ffmpeg does not include a \"%s\" encoder needed for output stream #%d:%d.\n",
                      avcodec_get_name(ost->st->codecpar->codec_id), ost->file_index, ost->index);
             ret = AVERROR(EINVAL);
             goto fail;

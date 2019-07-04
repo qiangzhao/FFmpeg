@@ -75,11 +75,11 @@
 #include "aac.h"
 #include "aactab.h"
 #include "aacdectab.h"
-#include "adts_header.h"
 #include "cbrt_data.h"
 #include "sbr.h"
 #include "aacsbr.h"
 #include "mpeg4audio.h"
+#include "aacadtsdec.h"
 #include "profiles.h"
 #include "libavutil/intfloat.h"
 
@@ -162,7 +162,7 @@ static void vector_pow43(int *coefs, int len)
     }
 }
 
-static void subband_scale(int *dst, int *src, int scale, int offset, int len, void *log_context)
+static void subband_scale(int *dst, int *src, int scale, int offset, int len)
 {
     int ssign = scale < 0 ? -1 : 1;
     int s = FFABS(scale);
@@ -189,18 +189,18 @@ static void subband_scale(int *dst, int *src, int scale, int offset, int len, vo
             dst[i] = out * (unsigned)ssign;
         }
     } else {
-        av_log(log_context, AV_LOG_ERROR, "Overflow in subband_scale()\n");
+        av_log(NULL, AV_LOG_ERROR, "Overflow in subband_scale()\n");
     }
 }
 
 static void noise_scale(int *coefs, int scale, int band_energy, int len)
 {
-    int s = -scale;
+    int ssign = scale < 0 ? -1 : 1;
+    int s = FFABS(scale);
     unsigned int round;
     int i, out, c = exp2tab[s & 3];
     int nlz = 0;
 
-    av_assert0(s >= 0);
     while (band_energy > 0x7fff) {
         band_energy >>= 1;
         nlz++;
@@ -216,20 +216,15 @@ static void noise_scale(int *coefs, int scale, int band_energy, int len)
         round = s ? 1 << (s-1) : 0;
         for (i=0; i<len; i++) {
             out = (int)(((int64_t)coefs[i] * c) >> 32);
-            coefs[i] = -((int)(out+round) >> s);
+            coefs[i] = ((int)(out+round) >> s) * ssign;
         }
     }
     else {
         s = s + 32;
-        if (s > 0) {
-            round = 1 << (s-1);
-            for (i=0; i<len; i++) {
-                out = (int)((int64_t)((int64_t)coefs[i] * c + round) >> s);
-                coefs[i] = -out;
-            }
-        } else {
-            for (i=0; i<len; i++)
-                coefs[i] = -(int64_t)coefs[i] * c * (1 << -s);
+        round = 1 << (s-1);
+        for (i=0; i<len; i++) {
+            out = (int)((int64_t)((int64_t)coefs[i] * c + round) >> s);
+            coefs[i] = out * ssign;
         }
     }
 }
@@ -390,7 +385,7 @@ static void apply_dependent_coupling_fixed(AACContext *ac,
                         for (k = offsets[i]; k < offsets[i + 1]; k++) {
                             tmp = (int)(((int64_t)src[group * 128 + k] * c + \
                                        (int64_t)0x1000000000) >> 37);
-                            dest[group * 128 + k] += (tmp + (int64_t)round) >> shift;
+                            dest[group * 128 + k] += (tmp + round) >> shift;
                         }
                     }
                 }
@@ -422,7 +417,7 @@ static void apply_independent_coupling_fixed(AACContext *ac,
     int i, c, shift, round, tmp;
     const int gain = cce->coup.gain[index][0];
     const int *src = cce->ch[0].ret;
-    unsigned int *dest = target->ret;
+    int *dest = target->ret;
     const int len = 1024 << (ac->oc[1].m4ac.sbr == 1);
 
     c = cce_scale_fixed[gain & 7];
@@ -441,7 +436,7 @@ static void apply_independent_coupling_fixed(AACContext *ac,
     else {
       for (i = 0; i < len; i++) {
           tmp = (int)(((int64_t)src[i] * c + (int64_t)0x1000000000) >> 37);
-          dest[i] += tmp * (1U << shift);
+          dest[i] += tmp * (1 << shift);
       }
     }
 }
