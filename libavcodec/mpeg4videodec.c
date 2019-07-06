@@ -3219,7 +3219,7 @@ end:
             return AVERROR_INVALIDDATA;
         }
         return decode_studio_vop_header(ctx, gb);
-    else
+    } else
         return decode_vop_header(ctx, gb);
 }
 
